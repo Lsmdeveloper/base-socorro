@@ -83,6 +83,7 @@ textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border
   <form class="login" id="f-login" style="grid-template-columns:1fr">
     <h1>Base Socorro</h1>
     <label for="matricula">Matrícula<input id="matricula" autocomplete="off" autocapitalize="characters" maxlength="20" required></label>
+    <label for="nome-login">Nome completo <span class="muted">(só no primeiro acesso)</span><input id="nome-login" autocomplete="name" maxlength="80"></label>
     <button class="primary" type="submit" id="btn-entrar">Entrar</button>
     <p class="msg" id="msg-login" role="status"></p>
   </form>
@@ -190,7 +191,7 @@ function mostrarLogin(txt){
 $("f-login").addEventListener("submit", async e => {
   e.preventDefault();
   $("btn-entrar").disabled = true; aviso("msg-login", "Entrando…");
-  try { await api("POST", "/api/entrar", {matricula: $("matricula").value}); $("matricula").value = ""; await abrirApp(); }
+  try { await api("POST", "/api/entrar", {matricula: $("matricula").value, nome: $("nome-login").value}); $("matricula").value = ""; $("nome-login").value = ""; await abrirApp(); }
   catch (err) { if (err.message) aviso("msg-login", err.message, true); }
   $("btn-entrar").disabled = false;
 });
@@ -321,7 +322,7 @@ $("f").addEventListener("submit", async e => {
 function desenharCoords(lista){
   $("coords").innerHTML = lista.map(c => `<div class="adm-row${c.ativo ? "" : " off"}">
     <div><div><b>${esc(c.nome)}</b> <span class="muted">${c.perfil === "admin" ? "· administrador" : "· " + c.cadastros + " cadastros"}</span></div>
-    <div class="mono">${esc(c.matricula)}</div></div>
+    <div class="mono">${esc(c.matricula)}${c.ip_cadastro ? ' <span class="muted">· IP ' + esc(c.ip_cadastro) + '</span>' : ""}</div></div>
     ${c.perfil === "admin" ? "" : `<button type="button" data-ativo="${c.ativo ? "0" : "1"}" data-m="${esc(c.matricula)}">${c.ativo ? "Desativar" : "Reativar"}</button>`}
   </div>`).join("");
 }

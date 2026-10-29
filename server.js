@@ -63,7 +63,15 @@ async function prepararBanco() {
       editado_em TIMESTAMPTZ
     );
     CREATE INDEX IF NOT EXISTS eleitores_matricula ON eleitores (matricula);
+    ALTER TABLE coordenadores ADD COLUMN IF NOT EXISTS nome_chave TEXT;
+    ALTER TABLE coordenadores ADD COLUMN IF NOT EXISTS ip_cadastro TEXT NOT NULL DEFAULT '';
+    CREATE UNIQUE INDEX IF NOT EXISTS coordenadores_nome_chave ON coordenadores (nome_chave);
   `);
+  const antigos = await pool.query('SELECT matricula, nome FROM coordenadores WHERE nome_chave IS NULL');
+  for (const c of antigos.rows) {
+    await pool.query('UPDATE coordenadores SET nome_chave = $1 WHERE matricula = $2', [chaveNome(c.nome), c.matricula])
+      .catch(e => { if (e.code !== '23505') throw e; });
+  }
   const { rows } = await pool.query('SELECT count(*)::int AS n FROM bairros');
   if (rows[0].n === 0) {
     for (let i = 0; i < BAIRROS_INICIAIS.length; i++) {
@@ -71,7 +79,7 @@ async function prepararBanco() {
     }
   }
   await pool.query(
-    `INSERT INTO coordenadores (matricula, nome, perfil, ativo) VALUES ($1, 'Administrador', 'admin', TRUE)
+    `INSERT INTO coordenadores (matricula, nome, nome_chave, perfil, ativo) VALUES ($1, 'Administrador', 'administrador', 'admin', TRUE)
      ON CONFLICT (matricula) DO UPDATE SET perfil = 'admin', ativo = TRUE`, [ADMIN]);
 }
 
@@ -150,6 +158,12 @@ function limiteLogin(req, res, next) {
 
 const limpar = (v, max) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
 
+// Nome comparável: sem acento, minúsculo, espaços simples ("João  Silva" = "joao silva")
+const chaveNome = nome => String(nome).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+const NOME_REPETIDO = 'Já existe um coordenador com esse nome. Use nome e sobrenome.';
+const nomeRepetido = e => e.code === '23505' && e.constraint === 'coordenadores_nome_chave';
+
 function gerarMatricula() {
   const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const b = crypto.randomBytes(8);
@@ -216,10 +230,28 @@ app.get('/api/saude', (req, res) => res.json({ ok: true }));
 
 app.post('/api/entrar', limiteLogin, rota(async (req, res) => {
   const m = limpar(req.body.matricula, 20).toUpperCase();
-  const { rows } = await pool.query('SELECT matricula FROM coordenadores WHERE matricula = $1 AND ativo', [m]);
-  if (!m || !rows.length) {
+  if (!/^[A-Z0-9.\-]{3,20}$/.test(m)) {
     req._tentativa.n++;
-    return res.status(401).json({ erro: 'Matrícula não encontrada ou inativa.' });
+    return res.status(400).json({ erro: 'Matrícula inválida. Use de 3 a 20 letras e números.' });
+  }
+  const { rows } = await pool.query('SELECT ativo FROM coordenadores WHERE matricula = $1', [m]);
+  if (rows.length && !rows[0].ativo) {
+    req._tentativa.n++;
+    return res.status(403).json({ erro: 'Esta matrícula foi desativada. Fale com o administrador.' });
+  }
+  // Primeiro acesso: cadastra a matrícula com o nome informado
+  if (!rows.length) {
+    const nome = limpar(req.body.nome, 80);
+    if (nome.length < 3) return res.status(400).json({ erro: 'Primeiro acesso: informe também o seu nome completo.' });
+    req._tentativa.n++;
+    try {
+      await pool.query('INSERT INTO coordenadores (matricula, nome, nome_chave, ip_cadastro) VALUES ($1, $2, $3, $4)',
+        [m, nome, chaveNome(nome), req.ip || '']);
+    } catch (e) {
+      if (nomeRepetido(e)) return res.status(409).json({ erro: NOME_REPETIDO });
+      if (e.code === '23505') return res.status(409).json({ erro: 'Tente entrar de novo.' });
+      throw e;
+    }
   }
   definirCookie(res, assinar({ m, exp: Date.now() + SESSAO_MS }), SESSAO_MS / 1000);
   res.json({ ok: true });
@@ -258,7 +290,7 @@ app.delete('/api/eleitores/:id', exigirLogin, rota(async (req, res) => {
 
 async function listaCoordenadores() {
   const { rows } = await pool.query(
-    `SELECT c.matricula, c.nome, c.perfil, c.ativo, count(e.id)::int AS cadastros
+    `SELECT c.matricula, c.nome, c.perfil, c.ativo, c.ip_cadastro, count(e.id)::int AS cadastros
      FROM coordenadores c LEFT JOIN eleitores e ON e.matricula = c.matricula
      GROUP BY c.matricula ORDER BY c.perfil = 'admin' DESC, c.nome`);
   return rows;
@@ -272,8 +304,13 @@ app.post('/api/coordenadores', exigirLogin, exigirAdmin, rota(async (req, res) =
   let m;
   for (let i = 0; i < 5; i++) {
     m = gerarMatricula();
-    const r = await pool.query('INSERT INTO coordenadores (matricula, nome) VALUES ($1, $2) ON CONFLICT DO NOTHING', [m, nome]);
-    if (r.rowCount) break;
+    try {
+      await pool.query('INSERT INTO coordenadores (matricula, nome, nome_chave) VALUES ($1, $2, $3)', [m, nome, chaveNome(nome)]);
+      break;
+    } catch (e) {
+      if (nomeRepetido(e)) return res.status(409).json({ erro: NOME_REPETIDO });
+      if (e.code !== '23505' || i === 4) throw e;
+    }
   }
   res.json({ matricula: m, lista: await listaCoordenadores() });
 }));
