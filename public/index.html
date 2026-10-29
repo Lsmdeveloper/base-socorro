@@ -346,51 +346,44 @@ $("num_titulo").addEventListener("input", e => { e.target.value = mascaraTitulo(
 ["zona", "sec_eleitoral"].forEach(id => $(id).addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); }));
 
 /* ---------- Colar do WhatsApp ---------- */
-// Lê nome, telefone, título, zona e seção de um texto copiado do WhatsApp (conversa, contato ou lista)
+// Lê nome, telefone, título, zona e seção de um texto copiado do WhatsApp, em qualquer ordem.
+// Um novo eleitor começa numa linha em branco ou quando um dado já preenchido aparece de novo.
 function lerWhats(texto){
   const out = [], vistos = {};
-  let pendente = "", atual = null, extras = {};
+  let cur = {};
   const LETRA = /[A-Za-zÀ-ÿ]{2}/;
-  const novo = (nome, tel) => {
-    const c = { nome: nome.trim().slice(0, 120), telefone: tel ? mascaraTel(tel) : "", num_titulo: "", zona: "", sec_eleitoral: "" };
-    Object.assign(c, extras); extras = {}; out.push(c); atual = c; pendente = ""; return c;
-  };
-  const extra = (campo, valor) => {
-    if (atual && !atual[campo]) atual[campo] = valor;
-    else extras[campo] = valor;
-  };
+  const fechar = () => { if (cur.nome || cur.telefone || cur.num_titulo) out.push(cur); cur = {}; };
+  const por = (campo, valor) => { if (cur[campo]) fechar(); cur[campo] = valor; };
   String(texto || "").split(/\r?\n/).forEach(bruta => {
     let l = bruta.replace(/[‎‏‪-‮]/g, "").trim();
+    if (!l) { fechar(); return; }
     const pref = l.match(/^\[?\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\]?\s*-?\s*/);
     if (pref){ l = l.slice(pref[0].length); l = l.replace(/^[^:]{1,40}:\s*/, ""); }
-    l = l.replace(/[*_~]/g, "");
-    // Campos com rótulo: título, zona, seção
-    l = l.replace(/t[íi]t(ulo)?\.?(\s+de\s+eleitor)?\s*(n[º°o.]*)?\s*[:\-]?\s*((?:\d[\s.]?){12})/i, (_, a, b, c, num) => { extra("num_titulo", num.replace(/\D/g, "")); return " "; });
-    l = l.replace(/\bzona\s*(eleitoral)?\s*[:\-]?\s*(\d{1,4})/i, (_, a, z) => { extra("zona", String(+z)); return " "; });
-    l = l.replace(/\bse[çc][ãa]o\s*(eleitoral)?\s*[:\-]?\s*(\d{1,4})/i, (_, a, z) => { extra("sec_eleitoral", String(+z)); return " "; });
-    l = l.replace(/^(nome|contato|tel(efone)?|cel(ular)?|whats(app)?|fone|zap)\s*[:\-]\s*/i, "").replace(/\s+/g, " ").trim();
-    if (!l || !/\w/.test(l)) return;
-    const m = l.match(/\+?\(?\d[\d\s().\-]{8,}\d/);
-    const dig = m ? m[0].replace(/\D/g, "") : "";
-    const resto = m ? (l.slice(0, m.index) + " " + l.slice(m.index + m[0].length)).replace(/[:\-–|,;]+/g, " ").replace(/\s+/g, " ").trim() : "";
-    if (m && dig.length === 12 && !/^\+|^55/.test(m[0].trim()) && tituloValido(dig)){
-      // Número de 12 dígitos sem rótulo que é um título válido
-      if (LETRA.test(resto)){ if (pendente) novo(pendente, ""); novo(resto, ""); }
-      extra("num_titulo", dig);
-    } else if (m && dig.length >= 10 && dig.length <= 13){
-      if (vistos[dig]) { pendente = ""; return; }
-      vistos[dig] = 1;
-      const nome = LETRA.test(resto) ? resto : pendente;
-      if (atual && !atual.telefone && (!nome || nome === atual.nome)) { atual.telefone = mascaraTel(dig); pendente = ""; }
-      else novo(nome, dig);
-    } else if (LETRA.test(l) && l.length <= 60 && !/[,?!]|https?:|www\./i.test(l)){
-      if (pendente) novo(pendente, "");
-      pendente = l; atual = null;
-    }
+    l = l.replace(/[*_~]/g, " ");
+    // Campos com rótulo (aceita "seção", "secao", "sessão", "sessao", "sec")
+    l = l.replace(/t[íi]t(ulo)?\.?(\s+de\s+eleitor)?\s*(n[º°o.]*)?\s*[:\-]?\s*((?:\d[\s.]?){12})/i, (_, a, b, c, num) => { por("num_titulo", num.replace(/\D/g, "")); return " "; });
+    l = l.replace(/\bz(ona|n)?\.?\s*(eleitoral)?\s*[:\-]?\s*(\d{1,4})\b/i, (_, a, b, z) => { por("zona", String(+z)); return " "; });
+    l = l.replace(/\b(se[çc][ãa]o|sess[ãa]o|se[çc]|sec|s)\.?\s*(eleitoral)?\s*[:\-]?\s*(\d{1,4})\b/i, (_, a, b, z) => { por("sec_eleitoral", String(+z)); return " "; });
+    l = l.replace(/^\s*(nome|contato|tel(efone)?|cel(ular)?|whats(app)?|fone|zap)\s*[:\-]\s*/i, "").replace(/\s+/g, " ").trim();
+    if (!l) return;
+    // Números soltos: título (12 dígitos válidos) ou telefone
+    let resto = l;
+    resto = resto.replace(/\+?\(?\d[\d\s().\-]{8,}\d/g, m => {
+      const dig = m.replace(/\D/g, "");
+      if (dig.length === 12 && !/^\+|^55/.test(m.trim()) && tituloValido(dig)) { por("num_titulo", dig); return " "; }
+      if (dig.length >= 10 && dig.length <= 13) {
+        const tel = mascaraTel(dig), chave = tel.replace(/\D/g, "");
+        if (!vistos[chave]) { vistos[chave] = 1; por("telefone", tel); }
+        return " ";
+      }
+      return m;
+    });
+    resto = resto.replace(/[:\-–|,;]+/g, " ").replace(/\s+/g, " ").trim();
+    if (LETRA.test(resto) && resto.length <= 60 && !/[?!]|https?:|www\./i.test(resto) && !/\d{3,}/.test(resto)) por("nome", resto.slice(0, 120));
   });
-  if (pendente) novo(pendente, "");
+  fechar();
   const util = out.filter(c => c.telefone || c.num_titulo);
-  return util.length ? util : out.filter(c => c.nome);
+  return (util.length ? util : out).map(c => ({ nome: c.nome || "", telefone: c.telefone || "", num_titulo: c.num_titulo || "", zona: c.zona || "", sec_eleitoral: c.sec_eleitoral || "" }));
 }
 let filaZap = [], posZap = 0;
 function preencherZap(c){
