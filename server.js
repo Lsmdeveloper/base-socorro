@@ -183,7 +183,7 @@ async function validarEleitor(d) {
     lideranca: limpar(d.lideranca, 80),
     nivel: NIVEIS.includes(d.nivel) ? d.nivel : 'provavel',
     titulo: TITULOS.includes(d.titulo) ? d.titulo : 'vota',
-    secao: limpar(d.secao, 80),
+    secao: d.secao === undefined ? null : limpar(d.secao, 80),
     num_titulo: String(d.num_titulo || '').replace(/\D/g, '').slice(0, 12),
     zona: String(d.zona || '').replace(/\D/g, '').slice(0, 4),
     sec_eleitoral: String(d.sec_eleitoral || '').replace(/\D/g, '').slice(0, 4)
@@ -272,7 +272,7 @@ app.post('/api/eleitores', exigirLogin, rota(async (req, res) => {
   await pool.query(
     `INSERT INTO eleitores (nome, telefone, bairro, lideranca, nivel, titulo, secao, matricula, coordenador, num_titulo, zona, sec_eleitoral)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-    [e.nome, e.telefone, e.bairro, e.lideranca, e.nivel, e.titulo, e.secao, req.user.matricula, req.user.nome, e.num_titulo, e.zona, e.sec_eleitoral]);
+    [e.nome, e.telefone, e.bairro, e.lideranca, e.nivel, e.titulo, e.secao || '', req.user.matricula, req.user.nome, e.num_titulo, e.zona, e.sec_eleitoral]);
   res.json(await dadosDoUsuario(req.user));
 }));
 
@@ -280,7 +280,7 @@ app.put('/api/eleitores/:id', exigirLogin, rota(async (req, res) => {
   if (!(await eleitorPermitido(req.user, req.params.id))) return res.status(404).json({ erro: 'Cadastro não encontrado.' });
   const e = await validarEleitor(req.body);
   await pool.query(
-    `UPDATE eleitores SET nome=$1, telefone=$2, bairro=$3, lideranca=$4, nivel=$5, titulo=$6, secao=$7, num_titulo=$9, zona=$10, sec_eleitoral=$11, editado_em=now()
+    `UPDATE eleitores SET nome=$1, telefone=$2, bairro=$3, lideranca=$4, nivel=$5, titulo=$6, secao=COALESCE($7, secao), num_titulo=$9, zona=$10, sec_eleitoral=$11, editado_em=now()
      WHERE id=$8`,
     [e.nome, e.telefone, e.bairro, e.lideranca, e.nivel, e.titulo, e.secao, req.params.id, e.num_titulo, e.zona, e.sec_eleitoral]);
   res.json(await dadosDoUsuario(req.user));
