@@ -54,6 +54,9 @@ button{font:inherit;font-weight:600;border-radius:7px;padding:9px 14px;border:1p
 .radios input{width:16px;height:16px;margin:0;padding:0;accent-color:var(--accent)}
 .zap-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .zap{margin-bottom:10px}
+.marca-lid{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.95rem;font-weight:600;color:var(--fg)}
+.marca-lid input{width:18px;height:18px;margin:0;padding:0;accent-color:var(--accent)}
+.lid-tag{display:inline-block;margin-left:6px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 5px;vertical-align:2px}
 .tzs{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:8px}
 .zap-fila{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:.9rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:10px}
 .zap-fila span{flex:1;min-width:0}
@@ -125,6 +128,7 @@ textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border
         <label for="telefone">Telefone / WhatsApp<input id="telefone" type="tel" inputmode="numeric" maxlength="15" placeholder="(79) 99999-9999" autocomplete="off"></label>
         <label for="bairro">Bairro<select id="bairro" required><option value="">Selecione o bairro</option></select></label>
         <label for="lideranca">Liderança responsável<input id="lideranca" list="lideres" maxlength="80" autocomplete="off"></label>
+        <label class="full marca-lid" for="eh_lideranca"><input type="checkbox" id="eh_lideranca"> Este eleitor é uma liderança</label>
         <div class="full grp"><span class="glbl">Compromisso</span><input type="hidden" id="nivel" value="provavel">
           <div class="chips" data-for="nivel" role="radiogroup" aria-label="Compromisso"><button type="button" data-v="certo">Voto certo</button><button type="button" data-v="provavel">Provável</button><button type="button" data-v="indeciso">Indeciso</button></div></div>
         <div class="full radios" role="radiogroup" aria-label="Título de eleitor">
@@ -148,7 +152,7 @@ textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border
   <section id="v-lista" hidden style="display:grid;gap:8px">
     <input id="q" type="search" placeholder="Buscar nome ou liderança" autocomplete="off">
     <input type="hidden" id="fn" value="">
-    <div class="chips fchips" data-for="fn" aria-label="Filtrar compromisso"><button type="button" data-v="">Todos</button><button type="button" data-v="certo">Certos</button><button type="button" data-v="provavel">Prováveis</button><button type="button" data-v="indeciso">Indecisos</button></div>
+    <div class="chips fchips" data-for="fn" aria-label="Filtrar compromisso"><button type="button" data-v="">Todos</button><button type="button" data-v="certo">Certos</button><button type="button" data-v="lider">Lideranças</button><button type="button" data-v="provavel">Prováveis</button><button type="button" data-v="indeciso">Indecisos</button></div>
     <input type="hidden" id="fb" value="">
     <div class="chips fchips" data-for="fb" id="fb-chips" aria-label="Filtrar bairro"></div>
     <p class="msg" id="msg-lista" role="status"></p>
@@ -266,7 +270,7 @@ function render(){
   $("bar").innerHTML = ["certo","provavel","indeciso"].map(k => `<span style="width:${Math.min(100, c[k]/meta*100)}%;background:${COL[k]}"></span>`).join("");
   $("legend").innerHTML = [["certo","certos"],["provavel","prováveis"],["indeciso","indecisos"]].map(([k,t]) => `<span><i class="dot" style="background:${COL[k]}"></i><b>${fmt(c[k])}</b> ${t}</span>`).join("");
 
-  const L = {}; rows.forEach(r => { if (r.lideranca) L[r.lideranca] = 1; });
+  const L = {}; rows.forEach(r => { if (r.lideranca) L[r.lideranca] = 1; if (r.eh_lideranca && r.nome) L[r.nome] = 1; });
   $("lideres").innerHTML = Object.keys(L).sort().map(l => `<option value="${esc(l)}">`).join("");
 
   const B = {}; rows.forEach(r => { if (r.bairro) B[r.bairro] = (B[r.bairro]||0) + 1; });
@@ -274,11 +278,11 @@ function render(){
   syncChips();
 
   const q = $("q").value.trim().toLowerCase(), fn = $("fn").value, fb = $("fb").value;
-  const vis = rows.filter(r => (!fn || r.nivel === fn) && (!fb || r.bairro === fb) &&
+  const vis = rows.filter(r => (!fn || (fn === "lider" ? r.eh_lideranca : r.nivel === fn)) && (!fb || r.bairro === fb) &&
     (!q || [r.nome, r.lideranca, r.coordenador].join(" ").toLowerCase().indexOf(q) >= 0));
   if (!rows.length){ $("list").innerHTML = '<div class="empty">Nenhum eleitor ainda. Cadastre o primeiro em “Cadastrar”.</div>'; return; }
   if (!vis.length){ $("list").innerHTML = '<div class="empty">Nada encontrado com esse filtro.</div>'; return; }
-  $("list").innerHTML = vis.map(r => `<div class="row"><span class="nome">${esc(r.nome)}</span><span class="pill p-${esc(r.nivel)}">${LBL[r.nivel]||""}</span>
+  $("list").innerHTML = vis.map(r => `<div class="row"><span class="nome">${esc(r.nome)}${r.eh_lideranca ? '<span class="lid-tag">Liderança</span>' : ""}</span><span class="pill p-${esc(r.nivel)}">${LBL[r.nivel]||""}</span>
     <span class="info">${[r.bairro, r.telefone, r.lideranca && ("Liderança: " + r.lideranca), (r.zona || r.sec_eleitoral) && ("Zona " + (r.zona || "?") + " · Seção " + (r.sec_eleitoral || "?")),  r.titulo === "transferiu" && "Transferiu título", estado.admin && r.coordenador && ("Por: " + r.coordenador)].filter(Boolean).map(esc).join(" · ")}</span>
     <div class="acts"><button type="button" data-ed="${esc(r.id)}">Editar</button>${confirmarExcluir === r.id
       ? `<button type="button" class="danger" data-delok="${esc(r.id)}">Confirmar exclusão</button><button type="button" data-delno="1">Não</button>`
@@ -293,7 +297,7 @@ $("list").addEventListener("click", async e => {
     const r = estado.rows.find(x => x.id === b.dataset.ed); if (!r) return;
     editando = r.id;
     $("nome").value = r.nome || ""; $("telefone").value = mascaraTel(r.telefone); $("bairro").value = r.bairro || "";
-    $("lideranca").value = r.lideranca || ""; $("num_titulo").value = mascaraTitulo(r.num_titulo); $("zona").value = r.zona || ""; $("sec_eleitoral").value = r.sec_eleitoral || "";
+    $("lideranca").value = r.lideranca || ""; $("eh_lideranca").checked = !!r.eh_lideranca; $("num_titulo").value = mascaraTitulo(r.num_titulo); $("zona").value = r.zona || ""; $("sec_eleitoral").value = r.sec_eleitoral || "";
     $("nivel").value = r.nivel || "provavel"; setTitulo(r.titulo); syncChips();
     $("form-title").textContent = "Editar eleitor"; $("save").textContent = "Salvar alterações"; $("cancel").hidden = false;
     mostrar("cadastro", true); $("nome").focus();
@@ -430,7 +434,7 @@ $("cancel").addEventListener("click", () => { filaZap = []; mostrarFila(); limpa
 $("f").addEventListener("submit", async e => {
   e.preventDefault();
   const d = { nome: $("nome").value.trim(), telefone: $("telefone").value.trim(), bairro: $("bairro").value,
-    lideranca: $("lideranca").value.trim(), nivel: $("nivel").value, titulo: tituloAtual(), num_titulo: $("num_titulo").value.replace(/\D/g, ""), zona: $("zona").value.replace(/\D/g, ""), sec_eleitoral: $("sec_eleitoral").value.replace(/\D/g, "") };
+    lideranca: $("lideranca").value.trim(), eh_lideranca: $("eh_lideranca").checked, nivel: $("nivel").value, titulo: tituloAtual(), num_titulo: $("num_titulo").value.replace(/\D/g, ""), zona: $("zona").value.replace(/\D/g, ""), sec_eleitoral: $("sec_eleitoral").value.replace(/\D/g, "") };
   if (!d.nome) return aviso("msg", "Informe o nome.", true);
   if (!d.bairro) return aviso("msg", "Escolha o bairro.", true);
   const dig = d.telefone.replace(/\D/g, "").length;

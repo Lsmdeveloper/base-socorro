@@ -66,6 +66,7 @@ async function prepararBanco() {
     ALTER TABLE eleitores ADD COLUMN IF NOT EXISTS num_titulo TEXT NOT NULL DEFAULT '';
     ALTER TABLE eleitores ADD COLUMN IF NOT EXISTS zona TEXT NOT NULL DEFAULT '';
     ALTER TABLE eleitores ADD COLUMN IF NOT EXISTS sec_eleitoral TEXT NOT NULL DEFAULT '';
+    ALTER TABLE eleitores ADD COLUMN IF NOT EXISTS eh_lideranca BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE coordenadores ADD COLUMN IF NOT EXISTS nome_chave TEXT;
     ALTER TABLE coordenadores ADD COLUMN IF NOT EXISTS ip_cadastro TEXT NOT NULL DEFAULT '';
     CREATE UNIQUE INDEX IF NOT EXISTS coordenadores_nome_chave ON coordenadores (nome_chave);
@@ -186,7 +187,8 @@ async function validarEleitor(d) {
     secao: d.secao === undefined ? null : limpar(d.secao, 80),
     num_titulo: String(d.num_titulo || '').replace(/\D/g, '').slice(0, 12),
     zona: String(d.zona || '').replace(/\D/g, '').slice(0, 4),
-    sec_eleitoral: String(d.sec_eleitoral || '').replace(/\D/g, '').slice(0, 4)
+    sec_eleitoral: String(d.sec_eleitoral || '').replace(/\D/g, '').slice(0, 4),
+    eh_lideranca: d.eh_lideranca === true
   };
   if (!e.nome) throw Object.assign(new Error('Informe o nome.'), { status: 400 });
   const bairros = await listarBairros();
@@ -201,7 +203,7 @@ async function dadosDoUsuario(u) {
   return {
     rows: q.rows.map(r => ({
       id: r.id, nome: r.nome, telefone: r.telefone, bairro: r.bairro, lideranca: r.lideranca,
-      nivel: r.nivel, titulo: r.titulo, secao: r.secao, num_titulo: r.num_titulo, zona: r.zona, sec_eleitoral: r.sec_eleitoral, coordenador: r.coordenador
+      nivel: r.nivel, titulo: r.titulo, secao: r.secao, num_titulo: r.num_titulo, zona: r.zona, sec_eleitoral: r.sec_eleitoral, eh_lideranca: r.eh_lideranca, coordenador: r.coordenador
     })),
     bairros: await listarBairros(),
     meta: META, nome: u.nome, admin: u.admin
@@ -270,9 +272,9 @@ app.get('/api/dados', exigirLogin, rota(async (req, res) => res.json(await dados
 app.post('/api/eleitores', exigirLogin, rota(async (req, res) => {
   const e = await validarEleitor(req.body);
   await pool.query(
-    `INSERT INTO eleitores (nome, telefone, bairro, lideranca, nivel, titulo, secao, matricula, coordenador, num_titulo, zona, sec_eleitoral)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-    [e.nome, e.telefone, e.bairro, e.lideranca, e.nivel, e.titulo, e.secao || '', req.user.matricula, req.user.nome, e.num_titulo, e.zona, e.sec_eleitoral]);
+    `INSERT INTO eleitores (nome, telefone, bairro, lideranca, nivel, titulo, secao, matricula, coordenador, num_titulo, zona, sec_eleitoral, eh_lideranca)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+    [e.nome, e.telefone, e.bairro, e.lideranca, e.nivel, e.titulo, e.secao || '', req.user.matricula, req.user.nome, e.num_titulo, e.zona, e.sec_eleitoral, e.eh_lideranca]);
   res.json(await dadosDoUsuario(req.user));
 }));
 
@@ -280,9 +282,9 @@ app.put('/api/eleitores/:id', exigirLogin, rota(async (req, res) => {
   if (!(await eleitorPermitido(req.user, req.params.id))) return res.status(404).json({ erro: 'Cadastro não encontrado.' });
   const e = await validarEleitor(req.body);
   await pool.query(
-    `UPDATE eleitores SET nome=$1, telefone=$2, bairro=$3, lideranca=$4, nivel=$5, titulo=$6, secao=COALESCE($7, secao), num_titulo=$9, zona=$10, sec_eleitoral=$11, editado_em=now()
+    `UPDATE eleitores SET nome=$1, telefone=$2, bairro=$3, lideranca=$4, nivel=$5, titulo=$6, secao=COALESCE($7, secao), num_titulo=$9, zona=$10, sec_eleitoral=$11, eh_lideranca=$12, editado_em=now()
      WHERE id=$8`,
-    [e.nome, e.telefone, e.bairro, e.lideranca, e.nivel, e.titulo, e.secao, req.params.id, e.num_titulo, e.zona, e.sec_eleitoral]);
+    [e.nome, e.telefone, e.bairro, e.lideranca, e.nivel, e.titulo, e.secao, req.params.id, e.num_titulo, e.zona, e.sec_eleitoral, e.eh_lideranca]);
   res.json(await dadosDoUsuario(req.user));
 }));
 
