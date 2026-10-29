@@ -52,6 +52,10 @@ button{font:inherit;font-weight:600;border-radius:7px;padding:9px 14px;border:1p
 .radios{display:flex;flex-wrap:wrap;gap:6px 18px}
 .radios label{display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:.9rem;font-weight:400;color:var(--fg)}
 .radios input{width:16px;height:16px;margin:0;padding:0;accent-color:var(--accent)}
+.zap-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.zap{margin-bottom:10px}
+.zap-fila{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:.9rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:10px}
+.zap-fila span{flex:1;min-width:0}
 .msg{font-size:.9rem;color:var(--muted);min-height:1.2em;margin:0}
 .msg.err{color:var(--bad)}
 .list{display:grid;gap:8px}
@@ -109,7 +113,12 @@ textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border
     </section>
 
     <section>
-      <h2 id="form-title" style="margin-bottom:8px">Novo eleitor</h2>
+      <div class="zap-top"><h2 id="form-title">Novo eleitor</h2><button type="button" class="lnk" id="zap-abrir">Colar do WhatsApp</button></div>
+      <div class="card zap" id="zap" hidden>
+        <label for="zap-txt">Cole a conversa ou os contatos<textarea id="zap-txt" rows="4" placeholder="George Santos&#10;79977228881"></textarea></label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="primary" id="zap-ok">Preencher</button><button type="button" id="zap-fechar">Fechar</button></div>
+      </div>
+      <div class="zap-fila" id="zap-fila" hidden><span id="zap-pos"></span><button type="button" class="lnk sec" id="zap-pular">Pular</button><button type="button" class="lnk sec" id="zap-parar">Parar</button></div>
       <form id="f">
         <label for="nome">Nome<input id="nome" required maxlength="120" autocomplete="off"></label>
         <label for="telefone">Telefone / WhatsApp<input id="telefone" type="tel" inputmode="numeric" maxlength="15" placeholder="(79) 99999-9999" autocomplete="off"></label>
@@ -313,6 +322,67 @@ $("telefone").addEventListener("input", e => {
   try { el.setSelectionRange(pos, pos); } catch (err) {}
 });
 
+/* ---------- Colar do WhatsApp ---------- */
+// Lê nomes e telefones de um texto copiado do WhatsApp (conversa, contato ou lista)
+function lerWhats(texto){
+  const out = [], vistos = {};
+  let pendente = "";
+  const add = (nome, tel) => {
+    const dig = tel.replace(/\D/g, "");
+    if (dig && vistos[dig]) return;
+    if (dig) vistos[dig] = 1;
+    out.push({ nome: nome.trim().slice(0, 120), telefone: mascaraTel(dig) });
+  };
+  String(texto || "").split(/\r?\n/).forEach(bruta => {
+    let l = bruta.replace(/[\u200e\u200f\u202a-\u202e]/g, "").trim();
+    // Prefixo de mensagem exportada: [29/10/26, 11:47] Fulano: ... ou 29/10/2026 11:47 - Fulano: ...
+    const pref = l.match(/^\[?\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\]?\s*-?\s*/);
+    if (pref){ l = l.slice(pref[0].length); l = l.replace(/^[^:]{1,40}:\s*/, ""); }
+    l = l.replace(/^(nome|contato|tel(efone)?|cel(ular)?|whats(app)?|fone|zap)\s*[:\-]\s*/i, "").trim();
+    if (!l) return;
+    const m = l.match(/\+?\(?\d[\d\s().\-]{8,}\d/);
+    const dig = m ? m[0].replace(/\D/g, "") : "";
+    if (m && dig.length >= 10 && dig.length <= 13){
+      const resto = (l.slice(0, m.index) + " " + l.slice(m.index + m[0].length)).replace(/[:\-–|,;]+/g, " ").replace(/\s+/g, " ").trim();
+      const nome = /[A-Za-zÀ-ÿ]{2}/.test(resto) ? resto : pendente;
+      add(nome, dig); pendente = "";
+    } else if (/[A-Za-zÀ-ÿ]{2}/.test(l) && l.length <= 60 && !/[,?!]|https?:|www\./i.test(l)){
+      if (pendente) add(pendente, "");
+      pendente = l.replace(/^[~*_\s]+|[~*_\s]+$/g, "");
+    }
+  });
+  if (pendente) add(pendente, "");
+  const comTel = out.some(c => c.telefone);
+  return out.filter(c => comTel ? c.telefone : c.nome);
+}
+let filaZap = [], posZap = 0;
+function preencherZap(c){
+  $("nome").value = c.nome || ""; $("telefone").value = c.telefone || "";
+  $("nome").focus();
+}
+function mostrarFila(){
+  const ativa = filaZap.length > 1 && posZap < filaZap.length;
+  $("zap-fila").hidden = !ativa;
+  if (ativa) $("zap-pos").textContent = `Contato ${posZap + 1} de ${filaZap.length} do WhatsApp`;
+}
+function proximoZap(){
+  posZap++;
+  if (posZap < filaZap.length){ preencherZap(filaZap[posZap]); mostrarFila(); }
+  else { const n = filaZap.length; filaZap = []; mostrarFila(); if (n > 1) aviso("msg", "Todos os contatos colados foram vistos."); }
+}
+$("zap-abrir").addEventListener("click", () => { $("zap").hidden = false; $("zap-txt").focus(); });
+$("zap-fechar").addEventListener("click", () => { $("zap").hidden = true; });
+$("zap-ok").addEventListener("click", () => {
+  const lista = lerWhats($("zap-txt").value);
+  if (!lista.length) return aviso("msg", "Não encontrei nome nem telefone no texto colado.", true);
+  if (editando) limparForm(true);
+  filaZap = lista; posZap = 0; preencherZap(lista[0]); mostrarFila();
+  $("zap-txt").value = ""; $("zap").hidden = true;
+  aviso("msg", lista.length > 1 ? `${lista.length} contatos encontrados. Confira, escolha o bairro e salve cada um.` : "Preenchido. Confira, escolha o bairro e salve.");
+});
+$("zap-pular").addEventListener("click", proximoZap);
+$("zap-parar").addEventListener("click", () => { filaZap = []; mostrarFila(); limparForm(true); aviso("msg", ""); });
+
 /* ---------- Formulário ---------- */
 function limparForm(manter){
   const b = $("bairro").value, l = $("lideranca").value;
@@ -320,7 +390,7 @@ function limparForm(manter){
   if (manter){ $("bairro").value = b; $("lideranca").value = l; }
   $("form-title").textContent = "Novo eleitor"; $("save").textContent = "Salvar eleitor"; $("cancel").hidden = true; syncChips();
 }
-$("cancel").addEventListener("click", () => limparForm(false));
+$("cancel").addEventListener("click", () => { filaZap = []; mostrarFila(); limparForm(false); });
 
 $("f").addEventListener("submit", async e => {
   e.preventDefault();
@@ -336,6 +406,7 @@ $("f").addEventListener("submit", async e => {
     aplicar(await api(eraEdicao ? "PUT" : "POST", eraEdicao ? "/api/eleitores/" + encodeURIComponent(editando) : "/api/eleitores", d));
     aviso("msg", eraEdicao ? "Alterações salvas." : d.nome + " cadastrado(a).");
     limparForm(!eraEdicao); $("nome").focus();
+    if (!eraEdicao && filaZap.length > 1) proximoZap();
   } catch (err) { if (err.message) aviso("msg", err.message, true); }
   $("save").disabled = false;
 });
