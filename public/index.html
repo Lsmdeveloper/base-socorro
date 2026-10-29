@@ -54,6 +54,7 @@ button{font:inherit;font-weight:600;border-radius:7px;padding:9px 14px;border:1p
 .radios input{width:16px;height:16px;margin:0;padding:0;accent-color:var(--accent)}
 .zap-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .zap{margin-bottom:10px}
+.tzs{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:8px}
 .zap-fila{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:.9rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:10px}
 .zap-fila span{flex:1;min-width:0}
 .msg{font-size:.9rem;color:var(--muted);min-height:1.2em;margin:0}
@@ -115,7 +116,7 @@ textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border
     <section>
       <div class="zap-top"><h2 id="form-title">Novo eleitor</h2><button type="button" class="lnk" id="zap-abrir">Colar do WhatsApp</button></div>
       <div class="card zap" id="zap" hidden>
-        <label for="zap-txt">Cole a conversa ou os contatos<textarea id="zap-txt" rows="4" placeholder="George Santos&#10;79977228881"></textarea></label>
+        <label for="zap-txt">Cole a conversa ou os contatos<textarea id="zap-txt" rows="4" placeholder="George Santos&#10;79977228881&#10;Título 0123 4567 2121 Zona 34 Seção 120"></textarea></label>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="primary" id="zap-ok">Preencher</button><button type="button" id="zap-fechar">Fechar</button></div>
       </div>
       <div class="zap-fila" id="zap-fila" hidden><span id="zap-pos"></span><button type="button" class="lnk sec" id="zap-pular">Pular</button><button type="button" class="lnk sec" id="zap-parar">Parar</button></div>
@@ -129,7 +130,12 @@ textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border
         <div class="full radios" role="radiogroup" aria-label="Título de eleitor">
           <label for="tit-vota"><input type="radio" name="titulo" id="tit-vota" value="vota" checked> Já vota em Socorro</label>
           <label for="tit-transf"><input type="radio" name="titulo" id="tit-transf" value="transferiu"> Transferiu título</label></div>
-        <label class="full" for="secao">Local de votação (opcional)<input id="secao" maxlength="80" placeholder="Escola ou zona/seção" autocomplete="off"></label>
+        <div class="full tzs">
+          <label for="num_titulo">Nº do título<input id="num_titulo" inputmode="numeric" maxlength="14" placeholder="0000 0000 0000" autocomplete="off"></label>
+          <label for="zona">Zona<input id="zona" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+          <label for="sec_eleitoral">Seção<input id="sec_eleitoral" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+        </div>
+        <label class="full" for="secao">Local de votação (opcional)<input id="secao" maxlength="80" placeholder="Escola" autocomplete="off"></label>
         <div class="full" style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="primary" type="submit" id="save">Salvar eleitor</button>
           <button type="button" id="cancel" hidden>Cancelar edição</button>
@@ -273,7 +279,7 @@ function render(){
   if (!rows.length){ $("list").innerHTML = '<div class="empty">Nenhum eleitor ainda. Cadastre o primeiro em “Cadastrar”.</div>'; return; }
   if (!vis.length){ $("list").innerHTML = '<div class="empty">Nada encontrado com esse filtro.</div>'; return; }
   $("list").innerHTML = vis.map(r => `<div class="row"><span class="nome">${esc(r.nome)}</span><span class="pill p-${esc(r.nivel)}">${LBL[r.nivel]||""}</span>
-    <span class="info">${[r.bairro, r.telefone, r.lideranca && ("Liderança: " + r.lideranca), r.secao, r.titulo === "transferiu" && "Transferiu título", estado.admin && r.coordenador && ("Por: " + r.coordenador)].filter(Boolean).map(esc).join(" · ")}</span>
+    <span class="info">${[r.bairro, r.telefone, r.lideranca && ("Liderança: " + r.lideranca), (r.zona || r.sec_eleitoral) && ("Zona " + (r.zona || "?") + " · Seção " + (r.sec_eleitoral || "?")), r.secao, r.titulo === "transferiu" && "Transferiu título", estado.admin && r.coordenador && ("Por: " + r.coordenador)].filter(Boolean).map(esc).join(" · ")}</span>
     <div class="acts"><button type="button" data-ed="${esc(r.id)}">Editar</button>${confirmarExcluir === r.id
       ? `<button type="button" class="danger" data-delok="${esc(r.id)}">Confirmar exclusão</button><button type="button" data-delno="1">Não</button>`
       : `<button type="button" class="danger" data-del="${esc(r.id)}">Excluir</button>`}</div></div>`).join("");
@@ -287,7 +293,7 @@ $("list").addEventListener("click", async e => {
     const r = estado.rows.find(x => x.id === b.dataset.ed); if (!r) return;
     editando = r.id;
     $("nome").value = r.nome || ""; $("telefone").value = mascaraTel(r.telefone); $("bairro").value = r.bairro || "";
-    $("lideranca").value = r.lideranca || ""; $("secao").value = r.secao || "";
+    $("lideranca").value = r.lideranca || ""; $("secao").value = r.secao || ""; $("num_titulo").value = mascaraTitulo(r.num_titulo); $("zona").value = r.zona || ""; $("sec_eleitoral").value = r.sec_eleitoral || "";
     $("nivel").value = r.nivel || "provavel"; setTitulo(r.titulo); syncChips();
     $("form-title").textContent = "Editar eleitor"; $("save").textContent = "Salvar alterações"; $("cancel").hidden = false;
     mostrar("cadastro", true); $("nome").focus();
@@ -322,42 +328,71 @@ $("telefone").addEventListener("input", e => {
   try { el.setSelectionRange(pos, pos); } catch (err) {}
 });
 
+/* ---------- Título, zona e seção ---------- */
+function mascaraTitulo(v){ const d = String(v || "").replace(/\D/g, "").slice(0, 12); return d.replace(/(\d{4})(?=\d)/g, "$1 "); }
+// Confere os dígitos verificadores do título de eleitor
+function tituloValido(t){
+  const d = String(t || "").replace(/\D/g, ""); if (d.length !== 12) return false;
+  const n = d.split("").map(Number), uf = d.slice(8, 10);
+  let s1 = 0; for (let i = 0; i < 8; i++) s1 += n[i] * (i + 2);
+  let dv1 = s1 % 11; if (dv1 === 10) dv1 = 0; if ((uf === "01" || uf === "02") && dv1 === 0 && s1 % 11 === 0) dv1 = 1;
+  let dv2 = (n[8] * 7 + n[9] * 8 + dv1 * 9) % 11; if (dv2 === 10) dv2 = 0; if ((uf === "01" || uf === "02") && dv2 === 0) dv2 = 1;
+  return dv1 === n[10] && dv2 === n[11];
+}
+$("num_titulo").addEventListener("input", e => { e.target.value = mascaraTitulo(e.target.value); });
+["zona", "sec_eleitoral"].forEach(id => $(id).addEventListener("input", e => { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4); }));
+
 /* ---------- Colar do WhatsApp ---------- */
-// Lê nomes e telefones de um texto copiado do WhatsApp (conversa, contato ou lista)
+// Lê nome, telefone, título, zona e seção de um texto copiado do WhatsApp (conversa, contato ou lista)
 function lerWhats(texto){
   const out = [], vistos = {};
-  let pendente = "";
-  const add = (nome, tel) => {
-    const dig = tel.replace(/\D/g, "");
-    if (dig && vistos[dig]) return;
-    if (dig) vistos[dig] = 1;
-    out.push({ nome: nome.trim().slice(0, 120), telefone: mascaraTel(dig) });
+  let pendente = "", atual = null, extras = {};
+  const LETRA = /[A-Za-zÀ-ÿ]{2}/;
+  const novo = (nome, tel) => {
+    const c = { nome: nome.trim().slice(0, 120), telefone: tel ? mascaraTel(tel) : "", num_titulo: "", zona: "", sec_eleitoral: "" };
+    Object.assign(c, extras); extras = {}; out.push(c); atual = c; pendente = ""; return c;
+  };
+  const extra = (campo, valor) => {
+    if (atual && !atual[campo]) atual[campo] = valor;
+    else extras[campo] = valor;
   };
   String(texto || "").split(/\r?\n/).forEach(bruta => {
-    let l = bruta.replace(/[\u200e\u200f\u202a-\u202e]/g, "").trim();
-    // Prefixo de mensagem exportada: [29/10/26, 11:47] Fulano: ... ou 29/10/2026 11:47 - Fulano: ...
+    let l = bruta.replace(/[‎‏‪-‮]/g, "").trim();
     const pref = l.match(/^\[?\d{1,2}\/\d{1,2}\/\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\]?\s*-?\s*/);
     if (pref){ l = l.slice(pref[0].length); l = l.replace(/^[^:]{1,40}:\s*/, ""); }
-    l = l.replace(/^(nome|contato|tel(efone)?|cel(ular)?|whats(app)?|fone|zap)\s*[:\-]\s*/i, "").trim();
-    if (!l) return;
+    l = l.replace(/[*_~]/g, "");
+    // Campos com rótulo: título, zona, seção
+    l = l.replace(/t[íi]t(ulo)?\.?(\s+de\s+eleitor)?\s*(n[º°o.]*)?\s*[:\-]?\s*((?:\d[\s.]?){12})/i, (_, a, b, c, num) => { extra("num_titulo", num.replace(/\D/g, "")); return " "; });
+    l = l.replace(/\bzona\s*(eleitoral)?\s*[:\-]?\s*(\d{1,4})/i, (_, a, z) => { extra("zona", String(+z)); return " "; });
+    l = l.replace(/\bse[çc][ãa]o\s*(eleitoral)?\s*[:\-]?\s*(\d{1,4})/i, (_, a, z) => { extra("sec_eleitoral", String(+z)); return " "; });
+    l = l.replace(/^(nome|contato|tel(efone)?|cel(ular)?|whats(app)?|fone|zap)\s*[:\-]\s*/i, "").replace(/\s+/g, " ").trim();
+    if (!l || !/\w/.test(l)) return;
     const m = l.match(/\+?\(?\d[\d\s().\-]{8,}\d/);
     const dig = m ? m[0].replace(/\D/g, "") : "";
-    if (m && dig.length >= 10 && dig.length <= 13){
-      const resto = (l.slice(0, m.index) + " " + l.slice(m.index + m[0].length)).replace(/[:\-–|,;]+/g, " ").replace(/\s+/g, " ").trim();
-      const nome = /[A-Za-zÀ-ÿ]{2}/.test(resto) ? resto : pendente;
-      add(nome, dig); pendente = "";
-    } else if (/[A-Za-zÀ-ÿ]{2}/.test(l) && l.length <= 60 && !/[,?!]|https?:|www\./i.test(l)){
-      if (pendente) add(pendente, "");
-      pendente = l.replace(/^[~*_\s]+|[~*_\s]+$/g, "");
+    const resto = m ? (l.slice(0, m.index) + " " + l.slice(m.index + m[0].length)).replace(/[:\-–|,;]+/g, " ").replace(/\s+/g, " ").trim() : "";
+    if (m && dig.length === 12 && !/^\+|^55/.test(m[0].trim()) && tituloValido(dig)){
+      // Número de 12 dígitos sem rótulo que é um título válido
+      if (LETRA.test(resto)){ if (pendente) novo(pendente, ""); novo(resto, ""); }
+      extra("num_titulo", dig);
+    } else if (m && dig.length >= 10 && dig.length <= 13){
+      if (vistos[dig]) { pendente = ""; return; }
+      vistos[dig] = 1;
+      const nome = LETRA.test(resto) ? resto : pendente;
+      if (atual && !atual.telefone && (!nome || nome === atual.nome)) { atual.telefone = mascaraTel(dig); pendente = ""; }
+      else novo(nome, dig);
+    } else if (LETRA.test(l) && l.length <= 60 && !/[,?!]|https?:|www\./i.test(l)){
+      if (pendente) novo(pendente, "");
+      pendente = l; atual = null;
     }
   });
-  if (pendente) add(pendente, "");
-  const comTel = out.some(c => c.telefone);
-  return out.filter(c => comTel ? c.telefone : c.nome);
+  if (pendente) novo(pendente, "");
+  const util = out.filter(c => c.telefone || c.num_titulo);
+  return util.length ? util : out.filter(c => c.nome);
 }
 let filaZap = [], posZap = 0;
 function preencherZap(c){
   $("nome").value = c.nome || ""; $("telefone").value = c.telefone || "";
+  $("num_titulo").value = mascaraTitulo(c.num_titulo); $("zona").value = c.zona || ""; $("sec_eleitoral").value = c.sec_eleitoral || "";
   $("nome").focus();
 }
 function mostrarFila(){
@@ -395,11 +430,13 @@ $("cancel").addEventListener("click", () => { filaZap = []; mostrarFila(); limpa
 $("f").addEventListener("submit", async e => {
   e.preventDefault();
   const d = { nome: $("nome").value.trim(), telefone: $("telefone").value.trim(), bairro: $("bairro").value,
-    lideranca: $("lideranca").value.trim(), nivel: $("nivel").value, titulo: tituloAtual(), secao: $("secao").value.trim() };
+    lideranca: $("lideranca").value.trim(), nivel: $("nivel").value, titulo: tituloAtual(), secao: $("secao").value.trim(),
+    num_titulo: $("num_titulo").value.replace(/\D/g, ""), zona: $("zona").value.replace(/\D/g, ""), sec_eleitoral: $("sec_eleitoral").value.replace(/\D/g, "") };
   if (!d.nome) return aviso("msg", "Informe o nome.", true);
   if (!d.bairro) return aviso("msg", "Escolha o bairro.", true);
   const dig = d.telefone.replace(/\D/g, "").length;
   if (dig && dig < 10) return aviso("msg", "Telefone incompleto. Use DDD + número, ex.: (79) 99999-9999.", true);
+  if (d.num_titulo && d.num_titulo.length !== 12) return aviso("msg", "O título tem 12 números. Confira o número digitado.", true);
   $("save").disabled = true; aviso("msg", "Salvando…");
   const eraEdicao = !!editando;
   try {
