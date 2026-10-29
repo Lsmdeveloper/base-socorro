@@ -107,7 +107,7 @@ textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border
   </header>
 
   <div id="v-cadastro" style="display:grid;gap:12px">
-    <section class="card" aria-label="Meta">
+    <section class="card" aria-label="Meta" id="meta-card" hidden>
       <div class="big" id="total">0 <small>/ 1.500 garantidos</small></div>
       <div class="bar" id="bar" aria-hidden="true"></div>
       <div class="legend" id="legend"></div>
@@ -261,7 +261,8 @@ function render(){
   const rows = estado.rows, meta = estado.meta || 1500;
   const c = {certo:0, provavel:0, indeciso:0}; rows.forEach(r => c[r.nivel] = (c[r.nivel]||0) + 1);
   $("n-total").textContent = fmt(rows.length);
-  $("total").innerHTML = fmt(c.certo) + ' <small>/ ' + fmt(meta) + ' garantidos' + (estado.admin ? '' : ' · seus cadastros') + '</small>';
+  $("total").innerHTML = fmt(c.certo) + ' <small>/ ' + fmt(meta) + ' garantidos</small>';
+  $("meta-card").hidden = !estado.admin;
   $("bar").innerHTML = ["certo","provavel","indeciso"].map(k => `<span style="width:${Math.min(100, c[k]/meta*100)}%;background:${COL[k]}"></span>`).join("");
   $("legend").innerHTML = [["certo","certos"],["provavel","prováveis"],["indeciso","indecisos"]].map(([k,t]) => `<span><i class="dot" style="background:${COL[k]}"></i><b>${fmt(c[k])}</b> ${t}</span>`).join("");
 
