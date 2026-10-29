@@ -177,7 +177,7 @@ async function api(metodo, url, corpo){
   let r;
   try { r = await fetch(url, op); } catch (e) { throw new Error("Sem conexão. Verifique a internet e tente de novo."); }
   const d = await r.json().catch(() => ({}));
-  if (r.status === 401 && d.erro === "SESSAO"){ mostrarLogin("Sua sessão terminou. Entre de novo com a matrícula."); throw new Error(""); }
+  if (r.status === 401 && d.erro === "SESSAO"){ mostrarLogin($("tela-app").hidden ? "" : "Sua sessão terminou. Entre de novo com a matrícula."); throw new Error(""); }
   if (!r.ok) throw new Error(d.erro || "Algo deu errado. Tente de novo.");
   return d;
 }
