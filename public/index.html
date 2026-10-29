@@ -135,7 +135,6 @@ textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border
           <label for="zona">Zona<input id="zona" inputmode="numeric" maxlength="4" autocomplete="off"></label>
           <label for="sec_eleitoral">Seção<input id="sec_eleitoral" inputmode="numeric" maxlength="4" autocomplete="off"></label>
         </div>
-        <label class="full" for="secao">Local de votação (opcional)<input id="secao" maxlength="80" placeholder="Escola" autocomplete="off"></label>
         <div class="full" style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="primary" type="submit" id="save">Salvar eleitor</button>
           <button type="button" id="cancel" hidden>Cancelar edição</button>
@@ -279,7 +278,7 @@ function render(){
   if (!rows.length){ $("list").innerHTML = '<div class="empty">Nenhum eleitor ainda. Cadastre o primeiro em “Cadastrar”.</div>'; return; }
   if (!vis.length){ $("list").innerHTML = '<div class="empty">Nada encontrado com esse filtro.</div>'; return; }
   $("list").innerHTML = vis.map(r => `<div class="row"><span class="nome">${esc(r.nome)}</span><span class="pill p-${esc(r.nivel)}">${LBL[r.nivel]||""}</span>
-    <span class="info">${[r.bairro, r.telefone, r.lideranca && ("Liderança: " + r.lideranca), (r.zona || r.sec_eleitoral) && ("Zona " + (r.zona || "?") + " · Seção " + (r.sec_eleitoral || "?")), r.secao, r.titulo === "transferiu" && "Transferiu título", estado.admin && r.coordenador && ("Por: " + r.coordenador)].filter(Boolean).map(esc).join(" · ")}</span>
+    <span class="info">${[r.bairro, r.telefone, r.lideranca && ("Liderança: " + r.lideranca), (r.zona || r.sec_eleitoral) && ("Zona " + (r.zona || "?") + " · Seção " + (r.sec_eleitoral || "?")),  r.titulo === "transferiu" && "Transferiu título", estado.admin && r.coordenador && ("Por: " + r.coordenador)].filter(Boolean).map(esc).join(" · ")}</span>
     <div class="acts"><button type="button" data-ed="${esc(r.id)}">Editar</button>${confirmarExcluir === r.id
       ? `<button type="button" class="danger" data-delok="${esc(r.id)}">Confirmar exclusão</button><button type="button" data-delno="1">Não</button>`
       : `<button type="button" class="danger" data-del="${esc(r.id)}">Excluir</button>`}</div></div>`).join("");
@@ -293,7 +292,7 @@ $("list").addEventListener("click", async e => {
     const r = estado.rows.find(x => x.id === b.dataset.ed); if (!r) return;
     editando = r.id;
     $("nome").value = r.nome || ""; $("telefone").value = mascaraTel(r.telefone); $("bairro").value = r.bairro || "";
-    $("lideranca").value = r.lideranca || ""; $("secao").value = r.secao || ""; $("num_titulo").value = mascaraTitulo(r.num_titulo); $("zona").value = r.zona || ""; $("sec_eleitoral").value = r.sec_eleitoral || "";
+    $("lideranca").value = r.lideranca || ""; $("num_titulo").value = mascaraTitulo(r.num_titulo); $("zona").value = r.zona || ""; $("sec_eleitoral").value = r.sec_eleitoral || "";
     $("nivel").value = r.nivel || "provavel"; setTitulo(r.titulo); syncChips();
     $("form-title").textContent = "Editar eleitor"; $("save").textContent = "Salvar alterações"; $("cancel").hidden = false;
     mostrar("cadastro", true); $("nome").focus();
@@ -430,8 +429,7 @@ $("cancel").addEventListener("click", () => { filaZap = []; mostrarFila(); limpa
 $("f").addEventListener("submit", async e => {
   e.preventDefault();
   const d = { nome: $("nome").value.trim(), telefone: $("telefone").value.trim(), bairro: $("bairro").value,
-    lideranca: $("lideranca").value.trim(), nivel: $("nivel").value, titulo: tituloAtual(), secao: $("secao").value.trim(),
-    num_titulo: $("num_titulo").value.replace(/\D/g, ""), zona: $("zona").value.replace(/\D/g, ""), sec_eleitoral: $("sec_eleitoral").value.replace(/\D/g, "") };
+    lideranca: $("lideranca").value.trim(), nivel: $("nivel").value, titulo: tituloAtual(), num_titulo: $("num_titulo").value.replace(/\D/g, ""), zona: $("zona").value.replace(/\D/g, ""), sec_eleitoral: $("sec_eleitoral").value.replace(/\D/g, "") };
   if (!d.nome) return aviso("msg", "Informe o nome.", true);
   if (!d.bairro) return aviso("msg", "Escolha o bairro.", true);
   const dig = d.telefone.replace(/\D/g, "").length;
