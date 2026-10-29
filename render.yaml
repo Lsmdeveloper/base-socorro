@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: base-socorro
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/saude
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_MATRICULA
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
