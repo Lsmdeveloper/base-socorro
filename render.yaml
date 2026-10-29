@@ -3,6 +3,7 @@ services:
     name: base-socorro
     runtime: node
     plan: free
+    region: virginia
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/saude
