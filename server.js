@@ -256,7 +256,7 @@ app.post('/api/entrar', limiteLogin, rota(async (req, res) => {
       await pool.query('INSERT INTO coordenadores (matricula, nome, nome_chave, ip_cadastro) VALUES ($1, $2, $3, $4)',
         [m, nome, chaveNome(nome), req.ip || '']);
     } catch (e) {
-      if (nomeRepetido(e)) return res.status(409).json({ erro: NOME_REPETIDO });
+      if (nomeRepetido(e)) return res.status(409).json({ erro: `A matrícula ${m} ainda não existe e o nome "${nome}" já pertence a outra matrícula. Se você já entrou antes, confira a sua matrícula. Se é seu primeiro acesso, use nome e sobrenome.` });
       if (e.code === '23505') return res.status(409).json({ erro: 'Tente entrar de novo.' });
       throw e;
     }
