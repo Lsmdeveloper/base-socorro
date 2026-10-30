@@ -200,12 +200,16 @@ async function dadosDoUsuario(u) {
   const q = u.admin
     ? await pool.query('SELECT * FROM eleitores ORDER BY criado_em DESC')
     : await pool.query('SELECT * FROM eleitores WHERE matricula = $1 ORDER BY criado_em DESC', [u.matricula]);
+  const t = await pool.query("SELECT nivel, count(*)::int AS n FROM eleitores WHERE COALESCE(titulo, '') <> 'precisa' GROUP BY nivel");
+  const totais = { certo: 0, provavel: 0, indeciso: 0 };
+  t.rows.forEach(r => { if (r.nivel in totais) totais[r.nivel] = r.n; });
   return {
     rows: q.rows.map(r => ({
       id: r.id, nome: r.nome, telefone: r.telefone, bairro: r.bairro, lideranca: r.lideranca,
       nivel: r.nivel, titulo: r.titulo, secao: r.secao, num_titulo: r.num_titulo, zona: r.zona, sec_eleitoral: r.sec_eleitoral, eh_lideranca: r.eh_lideranca, coordenador: r.coordenador
     })),
     bairros: await listarBairros(),
+    totais,
     meta: META, nome: u.nome, admin: u.admin
   };
 }

@@ -263,7 +263,9 @@ function desenharBairros(){
 /* ---------- Desenho ---------- */
 function render(){
   const rows = estado.rows, meta = estado.meta || 1500;
-  const c = {certo:0, provavel:0, indeciso:0}; rows.forEach(r => c[r.nivel] = (c[r.nivel]||0) + 1);
+  // Meta geral: soma de todos os coordenadores (vem do servidor)
+  let c = estado.totais;
+  if (!c){ c = {certo:0, provavel:0, indeciso:0}; rows.forEach(r => c[r.nivel] = (c[r.nivel]||0) + 1); }
   $("n-total").textContent = fmt(rows.length);
   $("total").innerHTML = fmt(c.certo) + ' <small>/ ' + fmt(meta) + '</small>';
   $("bar").innerHTML = ["certo","provavel","indeciso"].map(k => `<span style="width:${Math.min(100, c[k]/meta*100)}%;background:${COL[k]}"></span>`).join("");
